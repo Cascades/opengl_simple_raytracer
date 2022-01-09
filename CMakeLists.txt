@@ -2,6 +2,8 @@
 
 project(OpenGLRayTrace)
 
+set (CMAKE_CXX_STANDARD 20)
+
 add_subdirectory(third_party)
 
 add_executable(OpenGLRayTrace 
@@ -15,3 +17,4 @@ target_link_libraries(OpenGLRayTrace PUBLIC
 )
 
 install(TARGETS OpenGLRayTrace DESTINATION bin)
+install(DIRECTORY shaders DESTINATION ${CMAKE_INSTALL_PREFIX})
