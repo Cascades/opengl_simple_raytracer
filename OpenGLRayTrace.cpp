@@ -3,9 +3,12 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
+#include <glm/glm.hpp>
+
 #include <iostream>
 #include <fstream>
 #include <filesystem>
+#include <array>
 
 // Minimal test example from: https://github.com/litasa/Minimal-OpenGL-GLFW-GLEW
 
@@ -27,8 +30,45 @@ void file_to_string(std::filesystem::path const& shader_path, std::string& out_s
 	out_string = shader_string_stream.str();
 }
 
+class Camera
+{
+public:
+	glm::vec4 pos;
+	glm::vec4 dir;
+};
+
+struct Sphere
+{
+	glm::vec3 cen;
+	glm::float32 rad;
+};
+
+struct state_data
+{
+	glm::vec4 cam_pos;
+	glm::vec4 cam_dir;
+	glm::uvec2 screen_size;
+	glm::int32 iFrame;
+};
+
+class Scene
+{
+public:
+	std::array<Sphere, 1> spheres;
+};
+
 int main()
 {
+	auto scene = std::make_shared<Scene>();
+
+	scene->spheres[0].cen = glm::vec3(0.0f);
+	scene->spheres[0].rad = 3.0f;
+
+	auto camera = std::make_shared<Camera>();
+
+	camera->pos = glm::vec4(0.0f, 0.0f, -6.0f, 0.0f);
+	camera->dir = glm::vec4(0.0f, 0.0f, 1.0f, 0.0f);
+
 	// glfw: initialize and configure
 	// ------------------------------
 	glfwInit();
@@ -76,6 +116,16 @@ int main()
 	glAttachShader(ray_program, ray_shader);
 	glLinkProgram(ray_program);
 
+	GLint Success = 0;
+	GLchar ErrorLog[1024] = { 0 };
+
+	glGetProgramiv(ray_program, GL_LINK_STATUS, &Success);
+
+	if (Success == 0) {
+		glGetProgramInfoLog(ray_program, sizeof(ErrorLog), NULL, ErrorLog);
+		fprintf(stderr, "Error linking shader program: '%s'\n", ErrorLog);
+	}
+
 	std::string vert_code;
 	file_to_string(std::filesystem::current_path().parent_path() / "shaders/bufferless_triangle.vert", vert_code);
 	const char* vert_c_string_code = vert_code.c_str();
@@ -97,8 +147,7 @@ int main()
 	glAttachShader(presentation_program, frag_shader);
 	glLinkProgram(presentation_program);
 
-	GLint Success = 0;
-	GLchar ErrorLog[1024] = { 0 };
+	Success = 0;
 
 	glGetProgramiv(presentation_program, GL_LINK_STATUS, &Success);
 
@@ -109,6 +158,12 @@ int main()
 
 	unsigned int dummy_vao;
 	glGenVertexArrays(1, &dummy_vao);
+
+	unsigned int state_data_ubo;
+	glGenBuffers(1, &state_data_ubo);
+	glBindBuffer(GL_UNIFORM_BUFFER, state_data_ubo);
+	glBufferData(GL_UNIFORM_BUFFER, 152, NULL, GL_STATIC_DRAW); // allocate 152 bytes of memory
+	glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
 	// render loop
 	// -----------
@@ -162,7 +217,7 @@ void processInput(GLFWwindow* window)
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
 // ---------------------------------------------------------------------------------------------
-void framebuffer_size_callback(GLFWwindow* window, int width, int height)
+void framebuffer_size_callback([[maybe_unused]] GLFWwindow* window, int width, int height)
 {
 	// make sure the viewport matches the new window dimensions; note that width and 
 	// height will be significantly larger than specified on retina displays.
