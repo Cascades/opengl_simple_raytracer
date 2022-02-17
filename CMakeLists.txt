@@ -5,21 +5,23 @@ project(OpenGLRayTrace)
 set (CMAKE_CXX_STANDARD 20)
 
 add_subdirectory(third_party)
+add_subdirectory(camera)
 
 add_executable(OpenGLRayTrace 
 	OpenGLRayTrace.cpp
 	OpenGLRayTrace.h
-)
+ "camera/camera.cpp" "camera/include/OpenGLRayTrace/camera.h")
 
 target_link_libraries(OpenGLRayTrace PUBLIC
 	glew::glew
 	glfw::glfw
 	glm::glm
+	OpenGLRayTrace::Camera
 )
 
 if (MSVC)
     # warning level 4 and all warnings as errors
-    target_compile_options(OpenGLRayTrace PRIVATE /W4 /WX)
+    target_compile_options(OpenGLRayTrace PRIVATE /W4 /WX /Za)
 	string(REPLACE "/W3" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 else()
     # lots of warnings and all warnings as errors

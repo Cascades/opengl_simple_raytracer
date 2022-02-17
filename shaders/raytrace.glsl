@@ -2,26 +2,25 @@
 
 layout(local_size_x = 32, local_size_y = 32) in;
 
-struct Sphere
-{
-	vec3 cen;
-	float rad;
-};
-
 layout(std430) buffer;
 
 layout(binding = 0, location = 0, rgba32f) uniform image2D output_texture;
 
-layout(binding = 1) buffer StateDataSSBO {
+layout(std140, binding = 1) uniform StateDataUBO {
 	vec4 cam_pos;
 	vec4 cam_dir;
+	vec4 cam_up;
 	uvec2 screen_size;
 	int iFrame;
 } state_data;
 
-layout(binding = 2) buffer SceneDataSSBO {
-	int spheres[];
-} scene_data;
+layout(binding = 2) buffer SpherePosSSBO {
+	vec4 sphere_pos[];
+} sphere_pos_data;
+
+layout(binding = 3) buffer SphereRadSSBO {
+	float sphere_rads[];
+} sphere_rad_data;
 
 bool sphere_intersect(in vec3 ray_pos, in vec3 ray_dir, in vec3 sph_cen, in float sph_rad, inout float t)
 {
@@ -37,37 +36,51 @@ bool sphere_intersect(in vec3 ray_pos, in vec3 ray_dir, in vec3 sph_cen, in floa
 	return false;
 }
 
-void main()
+void get_ortho_ray(in ivec2 storePos, in vec2 cam_size, in vec3 cam_left, in vec3 cam_up, in vec3 cam_forward, out vec3 ray_pos, out vec3 ray_dir)
 {
-	Sphere test_sphere;
-	test_sphere.cen = vec3(0.0, 0.0, -10.0);
-	test_sphere.rad = 6.0;
-
-	ivec2 storePos = ivec2(gl_GlobalInvocationID.xy);
-	vec2 uv = storePos / vec2(800.0, 600.0);
-
-	vec3 cam_pos = vec3(0.0, 0.0, 0.0);
-	vec3 cam_forward = vec3(0.0, 0.0, -1.0);
-	vec3 cam_left = vec3(1.0, 0.0, 0.0);
-	vec3 cam_up = vec3(0.0, 1.0, 0.0);
-	vec2 cam_size = vec2(8.0, 6.0);
-
 	ivec2 dims = imageSize(output_texture); // fetch image dimensions
 	vec3 x = (float(storePos.x * 2 - dims.x) / dims.x) * cam_size.x * cam_left;
 	vec3 y = (float(storePos.y * 2 - dims.y) / dims.y) * cam_size.y * cam_up;
-	vec3 ray_pos = cam_pos + x + y;
-	vec3 ray_dir = cam_forward; // ortho
+	ray_pos = state_data.cam_pos.xyz + x + y;
+	ray_dir = cam_forward; // ortho
+}
 
-	float t;
-	bool hit = sphere_intersect(ray_pos, ray_dir, test_sphere.cen, test_sphere.rad, t);
-	// hit one or both sides
-	if (hit) {
-		imageStore(output_texture, storePos, vec4(t/10.0, 0.0, 0.0, 1.0));
-	}
-	else
+void get_proj_ray(in ivec2 storePos, in vec2 cam_size, in vec3 cam_left, in vec3 cam_up, in vec3 cam_forward, out vec3 ray_pos, out vec3 ray_dir)
+{
+	ivec2 dims = imageSize(output_texture); // fetch image dimensions
+	vec3 x = (float(storePos.x * 2 - dims.x) / dims.x) * cam_size.x * cam_left;
+	vec3 y = (float(storePos.y * 2 - dims.y) / dims.y) * cam_size.y * cam_up;
+	ray_pos = state_data.cam_pos.xyz;
+	ray_dir = normalize(x + y + cam_forward * 10.0); // proj
+}
+
+void main()
+{
+	ivec2 storePos = ivec2(gl_GlobalInvocationID.xy);
+	imageStore(output_texture, storePos, vec4(0.0, 0.0, 0.0, 1.0));
+
+	vec2 uv = storePos / vec2(800.0, 600.0);
+
+	vec2 cam_size = vec2(8.0, 6.0);
+
+	vec3 ray_pos;
+	vec3 ray_dir;
+
+	get_proj_ray(storePos, cam_size, -normalize(cross(state_data.cam_up.xyz, state_data.cam_dir.xyz)), state_data.cam_up.xyz, state_data.cam_dir.xyz, ray_pos, ray_dir);
+
+	float max_t = 10000000000000000.0;
+
+	for (int sphere = 0; sphere < sphere_pos_data.sphere_pos.length(); ++sphere)
 	{
-		imageStore(output_texture, storePos, vec4(0.0, 0.0, 0.0, 1.0));
-	}
+		vec3 test_sphere_pos = sphere_pos_data.sphere_pos[sphere].xyz;
+		float test_sphere_rad = sphere_rad_data.sphere_rads[sphere];
 
-	//imageStore(output_texture, storePos, vec4(ray_pos.x, ray_pos.y, 0.0, 1.0));
+		float t;
+		bool hit = sphere_intersect(ray_pos, ray_dir, test_sphere_pos, test_sphere_rad / 2.0, t);
+		// hit one or both sides
+		if (hit && t < max_t) {
+			max_t = t;
+			imageStore(output_texture, storePos, vec4(t / 10.0, 0.0, 0.0, 1.0));
+		}
+	}
 }
