@@ -8,6 +8,9 @@
 #include <glm/gtx/rotate_vector.hpp>
 #include <glm/gtx/string_cast.hpp>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb/stb_image.h>
+
 #include <iostream>
 #include <fstream>
 #include <filesystem>
@@ -35,12 +38,25 @@ void file_to_string(std::filesystem::path const& shader_path, std::string& out_s
 	out_string = shader_string_stream.str();
 }
 
+void opengl_debug_callback([[maybe_unused]] GLenum source,
+	[[maybe_unused]] GLenum type,
+	[[maybe_unused]] GLuint id,
+	[[maybe_unused]] GLenum severity,
+	[[maybe_unused]] GLsizei length,
+	[[maybe_unused]] const GLchar* message,
+	[[maybe_unused]] const void* userParam)
+{
+	std::cout << "GL Error:" << std::endl;
+	std::cout << message << std::endl;
+}
+
 class Window
 {
 public:
 	double last_x = 0.0;
 	double last_y = 0.0;
 	bool first_mouse = true;
+	float movement_speed = 0.1f;
 
 	std::shared_ptr<OGLRT::Camera> camera = std::make_shared<OGLRT::Camera>();
 	GLFWwindow* window;
@@ -67,25 +83,35 @@ public:
 
 	void processInput()
 	{
+		float local_movement_speed = movement_speed;
+		if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
+		{
+			local_movement_speed *= 10.0f;
+		}
+		if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
+		{
+			local_movement_speed /= 10.0f;
+		}
+
 		if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 		{
 			glfwSetWindowShouldClose(window, true);
 		}
 		if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
 		{
-			camera->pos += camera->dir * 0.1f;
+			camera->pos += camera->dir * local_movement_speed;
 		}
 		if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
 		{
-			camera->pos -= camera->right * 0.1f;
+			camera->pos -= camera->right * local_movement_speed;
 		}
 		if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
 		{
-			camera->pos -= camera->dir * 0.1f;
+			camera->pos -= camera->dir * local_movement_speed;
 		}
 		if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
 		{
-			camera->pos += camera->right * 0.1f;
+			camera->pos += camera->right * local_movement_speed;
 		}
 	}
 
@@ -143,6 +169,9 @@ int main()
 {
 	auto scene = std::make_shared<Scene>();
 
+	scene->spheres.pos.emplace_back(0.0f);
+	scene->spheres.rads.emplace_back(500.0f);
+
 	for (int i = 0; i < 5; ++i)
 	{
 		scene->spheres.pos.emplace_back(-12.0f + static_cast<float>(i) * 6.0f, 0.0f, -10.0f, 0.0f);
@@ -166,6 +195,8 @@ int main()
 
 
 	//glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+
+	glDebugMessageCallback(opengl_debug_callback, nullptr);
 
 	GLuint compute_output_texture;
 	glGenTextures(1, &compute_output_texture);
@@ -259,6 +290,41 @@ int main()
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, scene_sphere_rad_ssbo);
 	glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, scene->spheres.rads.size() * sizeof(decltype(scene->spheres.rads)::value_type), scene->spheres.rads.data());
 	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+	unsigned int sphere_map_tex;
+	glGenTextures(1, &sphere_map_tex);
+
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, sphere_map_tex);
+
+	int width, height, nrChannels;
+	std::cout << "Loading image into main memory" << std::endl;
+	stbi_set_flip_vertically_on_load(true);
+	unsigned char* data = stbi_load("assets/blaubeuren_church_square_4k.png", &width, &height, &nrChannels, 0);
+	std::cout << "Image loaded with:" << std::endl;
+	std::cout << "|_ width: " << width << std::endl;
+	std::cout << "|_ height: " << height << std::endl;
+	std::cout << "|_ channels: " << nrChannels << std::endl;
+
+	if (data)
+	{
+		std::cout << "Loading image into GPU memory" << std::endl;
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+		glGenerateMipmap(GL_TEXTURE_2D);
+		std::cout << "Texture generated" << std::endl;
+	}
+	else
+	{
+		std::cout << "Failed to load texture" << std::endl;
+	}
+	stbi_image_free(data);
+	std::cout << "CPU image freed" << std::endl;
+
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, sphere_map_tex);
+
+	glUseProgram(ray_program);
+	glUniform1i(glGetUniformLocation(ray_program, "sphere_map"), 1);
 
 	// render loop
 	// -----------

@@ -1,10 +1,11 @@
 #version 460
-
+#define PI 3.1415926538
 layout(local_size_x = 32, local_size_y = 32) in;
 
 layout(std430) buffer;
 
 layout(binding = 0, location = 0, rgba32f) uniform image2D output_texture;
+layout(binding = 4) uniform sampler2D sphere_map;
 
 layout(std140, binding = 1) uniform StateDataUBO {
 	vec4 cam_pos;
@@ -30,7 +31,22 @@ bool sphere_intersect(in vec3 ray_pos, in vec3 ray_dir, in vec3 sph_cen, in floa
 	float det = b * b - c;
 	if (det >= 0.0)
 	{
-		t = min(-b - sqrt(det), -b + sqrt(det));
+		if (-b - sqrt(det) < 0)
+		{
+			t = -b + sqrt(det);
+		}
+		else if (-b + sqrt(det) < 0)
+		{
+			t = -b - sqrt(det);
+		}
+		else
+		{
+			t = min(-b - sqrt(det), -b + sqrt(det));
+		}
+		if (t < 0)
+		{
+			return false;
+		}
 		return true;
 	}
 	return false;
@@ -68,7 +84,7 @@ void main()
 
 	get_proj_ray(storePos, cam_size, -normalize(cross(state_data.cam_up.xyz, state_data.cam_dir.xyz)), state_data.cam_up.xyz, state_data.cam_dir.xyz, ray_pos, ray_dir);
 
-	float max_t = 10000000000000000.0;
+	float max_t = 1000000000000.0;
 
 	for (int sphere = 0; sphere < sphere_pos_data.sphere_pos.length(); ++sphere)
 	{
@@ -80,7 +96,18 @@ void main()
 		// hit one or both sides
 		if (hit && t < max_t) {
 			max_t = t;
-			imageStore(output_texture, storePos, vec4(t / 10.0, 0.0, 0.0, 1.0));
+			if (sphere == 0)
+			{
+				vec3 n = normalize((ray_pos + ray_dir * t) - vec3(0.0));
+				float u = atan(n.x, n.z) / (2.0 * PI) + 0.5;
+				u = u;
+				float v = n.y * 0.5 + 0.5;
+				imageStore(output_texture, storePos, texture(sphere_map, vec2(u,v)));
+			}
+			else
+			{
+				imageStore(output_texture, storePos, vec4(t / 10.0, 0.0, 0.0, 1.0));
+			}
 		}
 	}
 }

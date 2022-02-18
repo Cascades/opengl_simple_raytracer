@@ -6,3 +6,5 @@ add_subdirectory(glew-cmake)
 add_library(glew::glew ALIAS libglew_static)
 
 add_subdirectory(glm)
+
+include(stb.cmake)

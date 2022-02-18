@@ -7,6 +7,8 @@ set (CMAKE_CXX_STANDARD 20)
 add_subdirectory(third_party)
 add_subdirectory(camera)
 
+include(assets.cmake)
+
 add_executable(OpenGLRayTrace 
 	OpenGLRayTrace.cpp
 	OpenGLRayTrace.h
@@ -16,6 +18,7 @@ target_link_libraries(OpenGLRayTrace PUBLIC
 	glew::glew
 	glfw::glfw
 	glm::glm
+	stb::stb
 	OpenGLRayTrace::Camera
 )
 
