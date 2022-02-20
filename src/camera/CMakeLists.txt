@@ -12,4 +12,6 @@ target_link_libraries(camera
 	glm::glm
 )
 
+include_what_you_use_property(camera)
+
 add_library(OpenGLRayTrace::Camera ALIAS camera)

@@ -1,0 +1,7 @@
+[
+	include: ["@.*glm/detail/.*", "public", "<glm/glm.hpp>", "public" ],
+	include: ["@.*glm/ext/.*", "public", "<glm/glm.hpp>", "public" ],
+	include: ["@.*glm/fwd.hpp.*", "public", "<glm/glm.hpp>", "public" ],
+	symbol: ["glm::perspective", "public", "<glm/gtc/matrix_transform.hpp>", "public" ],
+	include: ["<cmath>", "public", "<glm/glm.hpp>", "public" ],
+]

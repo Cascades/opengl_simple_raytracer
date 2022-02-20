@@ -1,5 +1,4 @@
-#include <GL/glew.h>
-#include <GLFW/glfw3.h>
+#include "GL/glew.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -92,9 +91,9 @@ void OGLRT::Camera::ProcessMouseScroll(float yoffset)
 void OGLRT::Camera::updateCameraVectors()
 {
     glm::vec3 new_front;
-    new_front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
-    new_front.y = sin(glm::radians(pitch));
-    new_front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+    new_front.x = glm::cos(glm::radians(yaw)) * glm::cos(glm::radians(pitch));
+    new_front.y = glm::sin(glm::radians(pitch));
+    new_front.z = glm::sin(glm::radians(yaw)) * glm::cos(glm::radians(pitch));
     dir = glm::normalize(new_front);
     right = glm::normalize(glm::cross(dir, world_up));
     up = glm::normalize(glm::cross(right, dir));
